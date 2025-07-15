@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador de DXF - NOROAÇO</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        
+        :root {
+            --primary-blue: #0d6efd; 
+            --secondary-blue: #1a2b4d;
+            --light-gray: #f8f9fa;
+            --medium-gray: #e9ecef; 
+            --dark-gray: #343a40;
+            --text-color: #495057; 
+            --success-green: #198754; 
+            --error-red: #dc3545;
+        }
+        html { scroll-behavior: smooth; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--light-gray); color: var(--text-color); margin: 0; padding: 2em; line-height: 1.6; }
+        .container { max-width: 700px; margin: auto; background: #fff; padding: 2em 2.5em; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.08); border-top: 5px solid var(--primary-blue); }
+        header { text-align: center; margin-bottom: 2em; padding-bottom: 1.5em; border-bottom: 1px solid var(--medium-gray); }
+        header h1 { font-size: 2em; color: var(--secondary-blue); margin: 0; font-weight: 700; }
+        h2 { color: var(--primary-blue); border-bottom: 2px solid var(--medium-gray); padding-bottom: 10px; margin-top: 1.5em; font-size: 1.4em; }
+        label { display: block; margin-top: 1em; margin-bottom: 0.5em; font-weight: 600; font-size: 0.9em; }
+        input, select { width: 100%; padding: 0.8em; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; transition: all 0.2s; }
+        input:focus, select:focus { border-color: var(--primary-blue); outline: none; box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.1); }
+        input[type=checkbox] { width: auto; margin-right: 10px; transform: scale(1.2); }
+        button { padding: 1em; background-color: var(--primary-blue); color: white; border: none; border-radius: 8px; font-size: 1em; font-weight: 600; cursor: pointer; margin-top: 1em; transition: all 0.2s; }
+        button:hover { background-color: #0b5ed7; transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .hidden { display: none; }
+        .hole-entry { border: 1px solid var(--medium-gray); border-radius: 8px; padding: 1em; margin-top: 1em; background-color: #f8fafc; display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 1em; align-items: flex-end; }
+        .hole-entry label { font-size: 0.85em; }
+        .section { margin-top: 2em; padding-top: 1em; }
+        .flex-container { display: flex; gap: 1em; align-items: flex-end; }
+        .flex-container > div { flex-grow: 1; }
+        p.help-text { font-size: 0.9em; color: #6c757d; margin-top: 0.5em;}
+        #submitBtn { width: 100%; margin-top: 2.5em; background-color: var(--success-green); border: none; font-size: 1.1em; padding: 1.2em; }
+        #submitBtn:hover { background-color: #157347; }
+        .delete-btn { background-color: transparent; padding: 0.5em; margin: 0; margin-bottom: 5px; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; }
+        .delete-btn:hover { background-color: #ffebee; }
+        .delete-btn svg { fill: var(--error-red); }
+
+        #toast { visibility: hidden; min-width: 250px; margin-left: -125px; background-color: #333; color: #fff; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 1000; left: 50%; bottom: 30px; font-size: 17px; opacity: 0; transition: all 0.5s; }
+        #toast.show { visibility: visible; opacity: 1; }
+        #toast.success { background-color: var(--success-green); }
+        #toast.error { background-color: var(--error-red); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>GERADOR DE DXF NOROAÇO</h1>
+        </header>
+
+        <form action="/generate-dxf" method="post" id="dxf-form">
+            <div class="section">
+                <h2>1. Forma Principal</h2>
+                <p class="help-text">Selecione a forma e suas dimensões (em mm). A peça será desenhada com o <strong>canto inferior esquerdo na origem (0,0)</strong>.</p>
+                <label for="shape">Forma Geométrica:</label>
+                <select name="shape" id="shapeSelector" onchange="updateFormFields()" required>
+                    <option value="" disabled selected>-- Escolha uma forma --</option>
+                    <option value="rectangle">Retângulo / Quadrado</option>
+                    <option value="circle">Círculo</option>
+                    <option value="triangle">Triângulo Isósceles</option>
+                    <option value="right_triangle">Triângulo Retângulo</option>
+                    <option value="trapezoid">Trapézio Isósceles</option>
+                </select>
+                <div id="rectangleFields" class="hidden"><div class="flex-container"><div><label for="width">Largura Total:</label><input type="number" name="width" step="any"></div><div><label for="height">Altura Total:</label><input type="number" name="height" step="any"></div></div></div>
+                <div id="circleFields" class="hidden"><label for="diameter">Diâmetro Externo:</label><input type="number" name="diameter" step="any"></div>
+                <div id="triangleFields" class="hidden"><div class="flex-container"><div><label for="triangle_base">Base:</label><input type="number" name="triangle_base" step="any"></div><div><label for="triangle_height">Altura:</label><input type="number" name="triangle_height" step="any"></div></div></div>
+                <div id="rightTriangleFields" class="hidden"><div class="flex-container"><div><label for="rt_base">Base (Cateto 1):</label><input type="number" name="rt_base" step="any"></div><div><label for="rt_height">Altura (Cateto 2):</label><input type="number" name="rt_height" step="any"></div></div></div>
+                <div id="trapezoidFields" class="hidden"><div class="flex-container"><div><label for="trapezoid_large_base">Base Maior:</label><input type="number" name="trapezoid_large_base" step="any"></div><div><label for="trapezoid_small_base">Base Menor:</label><input type="number" name="trapezoid_small_base" step="any"></div><div><label for="trapezoid_height">Altura:</label><input type="number" name="trapezoid_height" step="any"></div></div></div>
+            </div>
+
+            <div class="section">
+                <h2>2. Furação Rápida (Replicar Furos)</h2>
+                <div class="flex-container">
+                    <div><label for="replicate_diameter">Diâmetro dos Furos:</label><input type="number" id="replicate_diameter" step="any"></div>
+                    <div><label for="replicate_offset">Distância da Borda (Offset):</label><input type="number" id="replicate_offset" step="any"></div>
+                    <div><button type="button" onclick="replicateHoles()">Replicar Furos</button></div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>3. Furos Manuais</h2>
+                <div id="holesContainer"></div>
+                <button type="button" onclick="addHole()">+ Adicionar Furo Manual</button>
+            </div>
+            
+            <div class="section">
+                <h2>4. Padrão de Plotagem (CTB)</h2>
+                <p class="help-text">Defina a cor padrão (Número ACI) para cada camada.</p>
+                <div class="flex-container">
+                    <div><label for="contour_color">Cor do Contorno:</label><input type="number" id="contour_color" name="contour_color" value="7" title="ACI 7: Branco/Preto"></div>
+                    <div><label for="holes_color">Cor dos Furos:</label><input type="number" id="holes_color" name="holes_color" value="7" title="ACI 1: Vermelho"></div>
+                    <div><label for="text_color">Cor do Texto/Cotas:</label><input type="number" id="text_color" name="text_color" value="7" title="ACI 2: Amarelo"></div>
+                </div>
+                <div><label for="include_dims" style="display: inline-flex; align-items: center; margin-top: 1em; font-weight: normal;"><input type="checkbox" id="include_dims" name="include_dims"> Incluir Cotas no Desenho</label></div>
+            </div>
+            
+            <div class="section">
+                <h2>5. Informações da Peça</h2>
+                 <label for="include_text_info" style="display: inline-flex; align-items: center; font-weight: normal;"><input type="checkbox" id="include_text_info" name="include_text_info" onchange="toggleTextInfo()"> Incluir Bloco de Informações e Calcular Peso</label>
+                <div id="text_info_div" class="hidden">
+                    <div class="flex-container">
+                        <div><label for="material_thickness">Espessura (mm):</label><input type="number" id="material_thickness" name="material_thickness" step="any" value="6.35"></div>
+                        <div><label for="part_quantity">Quantidade:</label><input type="number" id="part_quantity" name="part_quantity" value="1"></div>
+                    </div>
+                    <label for="material_density">Densidade do Material (kg/m³):</label><input type="number" id="material_density" name="material_density" step="any" value="7850" title="Aço Carbono ≈ 7850 kg/m³">
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>6. Nome do Arquivo</h2>
+                <label for="use_code_system_cb" style="display: inline-flex; align-items: center; font-weight: normal;">
+                    <input type="checkbox" id="use_code_system_cb" name="use_code_system" onchange="toggleCodeSystem()"> Usar Sistema de Código Sequencial
+                </label>
+                <div id="custom_name_div">
+                    <label for="custom_filename">Nome da Peça / Arquivo:</label>
+                    <input type="text" id="custom_filename" name="custom_filename" placeholder="ex: CHAPA_BASE_MOTOR" required>
+                </div>
+                <div id="code_system_div" class="hidden">
+                    <p class="help-text">Defina o prefixo e gere um código sequencial único.</p>
+                    <div class="flex-container">
+                        <div><label for="code_prefix">Prefixo do Código:</label><input type="text" id="code_prefix" name="code_prefix" placeholder="ex: DES-, PROJETO-"></div>
+                        <div><button type="button" onclick="suggestCode()">Sugerir Próximo Código</button></div>
+                    </div>
+                    <label for="drawing_code">Código do Desenho Final:</label>
+                    <input type="text" id="drawing_code" name="drawing_code">
+                </div>
+            </div>
+
+            <div id="submitContainer" style="margin-top: 2.5em;">
+                <button type="submit" name="submit_action" value="generate_files" id="submitBtn">Gerar Arquivo DXF</button>
+            </div>
+        </form>
+    </div>
+    
+    <div id="toast"></div>
+
+    <script>
+        let holeCounter = 0;
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message; toast.className = 'show ' + type;
+            setTimeout(() => { toast.className = toast.className.replace('show', ''); }, 3000);
+        }
+        function addHole(diameter = '', x = '', y = '') {
+            holeCounter++;
+            const holesContainer = document.getElementById('holesContainer');
+            const entryDiv = document.createElement('div');
+            entryDiv.className = 'hole-entry';
+            entryDiv.innerHTML = `<div><label>Diâmetro Furo:</label><input type="number" name="hole_diameter_${holeCounter}" step="any" value="${diameter}" required></div><div><label>Posição X:</label><input type="number" name="hole_x_${holeCounter}" step="any" value="${x}" required></div><div><label>Posição Y:</label><input type="number" name="hole_y_${holeCounter}" step="any" value="${y}" required></div><div><button type="button" class="delete-btn" onclick="this.closest('.hole-entry').remove()" title="Remover Furo"><svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/></svg></button></div>`;
+            holesContainer.appendChild(entryDiv);
+        }
+        function replicateHoles() {
+            const shape = document.getElementById('shapeSelector').value;
+            const diameter = document.getElementById('replicate_diameter').value;
+            const offset = parseFloat(document.getElementById('replicate_offset').value);
+            if (!diameter || isNaN(offset)) { showToast('Preencha Diâmetro e Offset para a furação rápida.', 'error'); return; }
+            document.getElementById('holesContainer').innerHTML = '';
+            try {
+                let holesToAdd = [];
+                switch (shape) {
+                    case 'rectangle': { const w = parseFloat(document.querySelector('#rectangleFields input[name=width]').value); const h = parseFloat(document.querySelector('#rectangleFields input[name=height]').value); holesToAdd = [[diameter, offset, offset], [diameter, w - offset, offset], [diameter, w - offset, h - offset], [diameter, offset, h - offset]]; break; }
+                    case 'right_triangle': { const b = parseFloat(document.querySelector('#rightTriangleFields input[name=rt_base]').value); const h = parseFloat(document.querySelector('#rightTriangleFields input[name=rt_height]').value); holesToAdd = [[diameter, offset, offset], [diameter, b - offset, offset], [diameter, offset, h - offset]]; break; }
+                    case 'triangle': { const b = parseFloat(document.querySelector('#triangleFields input[name=triangle_base]').value); const h = parseFloat(document.querySelector('#triangleFields input[name=triangle_height]').value); holesToAdd = [[diameter, offset, offset], [diameter, b - offset, offset], [diameter, b / 2, h - offset]]; break; }
+                    case 'trapezoid': { const lb = parseFloat(document.querySelector('#trapezoidFields input[name=trapezoid_large_base]').value); const sb = parseFloat(document.querySelector('#trapezoidFields input[name=trapezoid_small_base]').value); const h = parseFloat(document.querySelector('#trapezoidFields input[name=trapezoid_height]').value); const x_offset = (lb - sb) / 2; holesToAdd = [[diameter, offset, offset], [diameter, lb - offset, offset], [diameter, x_offset + offset, h - offset], [diameter, lb - x_offset - offset, h - offset]]; break; }
+                    default: showToast('Replicação de furos não disponível para esta forma.', 'error'); return;
+                }
+                holesToAdd.forEach(hole => addHole(...hole));
+                showToast('Furos replicados com sucesso!', 'success');
+            } catch (e) { showToast('Erro ao replicar furos. Verifique as dimensões da peça.', 'error'); }
+        }
+        function updateFormFields() {
+            const selector = document.getElementById('shapeSelector');
+            const formDivs = { rectangle: document.getElementById('rectangleFields'), circle: document.getElementById('circleFields'), triangle: document.getElementById('triangleFields'), right_triangle: document.getElementById('rightTriangleFields'), trapezoid: document.getElementById('trapezoidFields') };
+            for (const key in formDivs) { if (formDivs[key]) { formDivs[key].classList.add('hidden'); formDivs[key].querySelectorAll('input').forEach(i => { i.required = false; i.disabled = true; }); } }
+            document.getElementById('holesContainer').innerHTML = ''; holeCounter = 0;
+            const selectedShape = selector.value;
+            if (formDivs[selectedShape]) { formDivs[selectedShape].classList.remove('hidden'); formDivs[selectedShape].querySelectorAll('input').forEach(i => { i.required = true; i.disabled = false; }); }
+        }
+        function toggleTextInfo() { document.getElementById('text_info_div').classList.toggle('hidden', !document.getElementById('include_text_info').checked); }
+        function toggleCodeSystem() {
+            const useCodeSystem = document.getElementById('use_code_system_cb').checked;
+            document.getElementById('custom_name_div').classList.toggle('hidden', useCodeSystem);
+            document.getElementById('code_system_div').classList.toggle('hidden', !useCodeSystem);
+            document.getElementById('custom_filename').required = !useCodeSystem;
+            document.getElementById('drawing_code').required = useCodeSystem;
+        }
+        async function suggestCode() {
+            const prefixInput = document.getElementById('code_prefix');
+            const prefix = prefixInput.value.trim().toUpperCase();
+            if (!prefix) { showToast('Por favor, insira um prefixo.', 'error'); prefixInput.focus(); return; }
+            try {
+                const response = await fetch(`/get-next-code?prefix=${encodeURIComponent(prefix)}`);
+                const data = await response.json();
+                if (response.ok) { document.getElementById('drawing_code').value = data.next_code; showToast('Código sugerido com sucesso!', 'success');
+                } else { showToast(`Erro: ${data.error}`, 'error'); }
+            } catch (error) { showToast('Não foi possível conectar ao servidor.', 'error'); }
+        }
+        document.getElementById('dxf-form').addEventListener('submit', function(event) {
+            setTimeout(() => {
+                showToast('Arquivo DXF gerado com sucesso!', 'success');
+                this.reset();
+                updateFormFields(); toggleTextInfo(); toggleCodeSystem();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }, 500);
+        });
+        window.onload = () => { updateFormFields(); toggleTextInfo(); toggleCodeSystem(); };
+    </script>
+</body>
+</html>
